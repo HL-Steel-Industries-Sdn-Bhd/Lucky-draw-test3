@@ -82,10 +82,10 @@ h1 { color: #2575fc; margin-bottom: 10px; font-size: 2.5rem; text-shadow: 1px 1p
 </div>
 <script>
 const prizes = [
-{ name: "再来一次", probability: 0.4, color: "#FF6B8B" },
-{ name: "二等奖", probability: 0.2, color: "#4ECDC4" },
-{ name: "三等奖", probability: 0.3, color: "#06D6A0" },
-{ name: "一等奖", probability: 0.1, color: "#FFD166" }
+{ name: "再来一次", probability: 0.4, start:1, end:8, color: "#FF6B8B" },
+{ name: "二等奖", probability: 0.2, start:9, end:12, color: "#4ECDC4" },
+{ name: "三等奖", probability: 0.3, start:13, end:18, color: "#06D6A0" },
+{ name: "一等奖", probability: 0.1, start:19, end:20, color: "#FFD166" }
 ];
 
 let canvas = document.getElementById('wheelCanvas');
@@ -102,52 +102,47 @@ let maxSpeed = 25;
 let targetPrizeIndex = -1;
 let stopRotation = 0;
 
-// 初始指针位置固定在“一等奖-再来一次”边界
-const initialRotation = getBoundaryAngle(3,0); 
-currentRotation = initialRotation;
+// 每份边长角度
+const anglePerSegment = 360/20;
+// 初始指针在“一等奖-再来一次”边界线
+currentRotation = 0; // 初始旋转角为0即可，因为我们用边长计算旋转
 
-function drawWheel(rotation = 0) {
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
+function drawWheel(rotation = 0){
+    const centerX = canvas.width/2;
+    const centerY = canvas.height/2;
     const radius = Math.min(centerX, centerY) - 10;
     ctx.clearRect(0,0,canvas.width,canvas.height);
     ctx.save();
     ctx.translate(centerX, centerY);
-    ctx.rotate(rotation * Math.PI / 180);
+    ctx.rotate(rotation*Math.PI/180);
     ctx.translate(-centerX, -centerY);
-
-    let startAngle = -Math.PI/2;
-    prizes.forEach((prize)=>{
-        const angle = prize.probability*2*Math.PI;
-        const endAngle = startAngle + angle;
-        ctx.beginPath();
-        ctx.moveTo(centerX, centerY);
-        ctx.arc(centerX, centerY, radius, startAngle, endAngle);
-        ctx.closePath();
-        ctx.fillStyle = prize.color;
-        ctx.fill();
-        ctx.strokeStyle='#fff';
-        ctx.lineWidth=2;
-        ctx.stroke();
-        ctx.save();
-        ctx.translate(centerX, centerY);
-        ctx.rotate(startAngle + angle/2);
-        ctx.fillStyle='white';
-        ctx.font='bold 18px Arial';
-        ctx.textAlign='center';
-        ctx.textBaseline='middle';
-        ctx.shadowColor='rgba(0,0,0,0.5)';
-        ctx.shadowBlur=3;
-        ctx.shadowOffsetX=1;
-        ctx.shadowOffsetY=1;
-        const textRadius = radius*0.7;
-        ctx.fillText(prize.name,textRadius,0);
-        ctx.font='16px Arial';
-        ctx.fillText(`${(prize.probability*100).toFixed(0)}%`,textRadius,20);
-        ctx.restore();
-        startAngle = endAngle;
+    let segment=1;
+    prizes.forEach(prize=>{
+        const segments = prize.end - prize.start +1;
+        for(let i=0;i<segments;i++){
+            const startAngle = ((segment-1)*anglePerSegment - 90)*Math.PI/180;
+            const endAngle = (segment*anglePerSegment - 90)*Math.PI/180;
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+            ctx.closePath();
+            ctx.fillStyle = prize.color;
+            ctx.fill();
+            ctx.strokeStyle='#fff';
+            ctx.lineWidth=2;
+            ctx.stroke();
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate((startAngle+endAngle)/2);
+            ctx.fillStyle='white';
+            ctx.font='bold 14px Arial';
+            ctx.textAlign='center';
+            ctx.textBaseline='middle';
+            ctx.fillText(prize.name, radius*0.7, 0);
+            ctx.restore();
+            segment++;
+        }
     });
-
     ctx.beginPath();
     ctx.arc(centerX, centerY, 15,0,2*Math.PI);
     ctx.fillStyle='#fff';
@@ -155,23 +150,6 @@ function drawWheel(rotation = 0) {
     ctx.lineWidth=3;
     ctx.stroke();
     ctx.restore();
-}
-
-function getPrizeCenterAngle(index){
-    let startAngle=-90;
-    for(let i=0;i<index;i++){
-        startAngle+=prizes[i].probability*360;
-    }
-    const prizeAngle = prizes[index].probability*360;
-    return startAngle + prizeAngle/2;
-}
-
-function getBoundaryAngle(leftIndex,rightIndex){
-    let startAngle=-90;
-    for(let i=0;i<=leftIndex;i++){
-        startAngle+=prizes[i].probability*360;
-    }
-    return startAngle;
 }
 
 function selectPrizeByProbability(){
@@ -194,17 +172,9 @@ function startSpin(){
     spinButton.querySelector('.button-text').textContent='停止';
     statusDisplay.textContent='转盘加速中...';
     resultDisplay.textContent='等待结果...';
-
     targetPrizeIndex = selectPrizeByProbability();
-
-    // 每次旋转独立计算动画角度
-    const prizeCenterAngle = getPrizeCenterAngle(targetPrizeIndex);
-    const extraSpins = 5; // 视觉效果的圈数
-    stopRotation = prizeCenterAngle + 360*extraSpins;
-
     spinSpeed=0;
     let lastTime = Date.now();
-
     function accelerate(){
         if(!isSpinning) return;
         const now = Date.now();
@@ -226,6 +196,13 @@ function startSpin(){
 
 function stopSpin(){
     if(!isSpinning || !isDecelerating) return;
+    // 计算目标角度
+    const prize = prizes[targetPrizeIndex];
+    const centerSegment = Math.floor((prize.start+prize.end)/2);
+    const targetAngle = 360 - centerSegment*anglePerSegment + anglePerSegment/2; // 顺时针旋转
+    const extraSpins = 5;
+    stopRotation = currentRotation + extraSpins*360 + targetAngle;
+
     let lastTime = Date.now();
     function decelerate(){
         const now = Date.now();
@@ -293,9 +270,7 @@ spinButton.addEventListener('click',function(){
 
 const debugBtn=document.getElementById('debugBtn');
 const centerMarker=document.getElementById('centerMarker');
-debugBtn.addEventListener('click',()=>{
-    centerMarker.style.display=centerMarker.style.display==='block'?'none':'block';
-});
+debugBtn.addEventListener('click',()=>{ centerMarker.style.display=centerMarker.style.display==='block'?'none':'block'; });
 
 window.addEventListener('load',function(){
     drawWheel(currentRotation);
