@@ -87,8 +87,8 @@ let isDecelerating=false;
 let targetPrizeIndex=-1;
 let stopRotation=0;
 
-// 初始指针在“一等奖-再来一次边界”
-const initialRotation=8*anglePerSegment; // 边长编号8对应再来一次的最后一条线
+// ✅ 修正初始旋转角度（canvas 正上方是 -90°）
+const initialRotation=-90 + 8*anglePerSegment; // “一等奖-再来一次边界线”
 currentRotation=initialRotation;
 
 function drawWheel(rotation=0){
@@ -146,10 +146,8 @@ function selectPrizeByProbability(){
 
 function getTargetRotation(prizeIndex){
     const prize=prizes[prizeIndex];
-    // 取对应边长中间的编号
     const segments=prize.segments;
     const midSegment=Math.floor((segments[0]+segments[segments.length-1])/2);
-    // 从初始线开始，顺时针旋转到目标中心
     return initialRotation + (midSegment-1)*anglePerSegment + 360*5; // 5圈视觉效果
 }
 
@@ -187,7 +185,7 @@ function startSpin(){
 
 function stopSpin(){
     if(!isSpinning || !isDecelerating)return;
-    // Step1: 先 reset 到初始线
+    // Step1: reset 到初始线
     currentRotation=initialRotation;
     drawWheel(currentRotation);
     // Step2: 顺时针旋转到目标奖品
@@ -198,7 +196,7 @@ function stopSpin(){
         const dt=now-lastTime;
         lastTime=now;
         const remaining=stopRotation-currentRotation;
-        const speed=Math.max(remaining/20,2); // 每帧旋转角度
+        const speed=Math.max(remaining/20,2);
         if(remaining<=0.5){
             currentRotation=stopRotation;
             drawWheel(currentRotation);
