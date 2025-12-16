@@ -6,6 +6,7 @@
 <title>幸运转盘抽奖</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
+/* 保留你原有的 CSS，这里略去重复显示 */
 * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; }
 body { display: flex; justify-content: center; align-items: center; min-height: 100vh; background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%); padding: 20px; color: #333; }
 .container { background-color: rgba(255, 255, 255, 0.95); border-radius: 20px; box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3); padding: 30px; width: 100%; max-width: 850px; text-align: center; overflow: hidden; position: relative; }
@@ -66,67 +67,83 @@ h1 { color: #2575fc; margin-bottom: 10px; font-size: 2.5rem; text-shadow: 1px 1p
 <button id="debugBtn" style="padding: 5px 10px; font-size: 12px; background: #333; color: white; border: none; border-radius: 3px; cursor: pointer;">显示中心点</button>
 </div>
 </div>
+
 <script>
-const prizes=[
-{name:"再来一次",probability:0.4,color:"#FF6B8B",segments:[1,2,3,4,5,6,7,8]},
-{name:"二等奖",probability:0.2,color:"#4ECDC4",segments:[9,10,11,12]},
-{name:"三等奖",probability:0.3,color:"#06D6A0",segments:[13,14,15,16,17,18]},
-{name:"一等奖",probability:0.1,color:"#FFD166",segments:[19,20]}
+const prizes = [
+  { name: "再来一次", probability: 0.4, color: "#FF6B8B", slices:[1,8] },
+  { name: "二等奖", probability: 0.2, color: "#4ECDC4", slices:[9,12] },
+  { name: "三等奖", probability: 0.3, color: "#06D6A0", slices:[13,18] },
+  { name: "一等奖", probability: 0.1, color: "#FFD166", slices:[19,20] }
 ];
-const segmentsTotal=20;
-const anglePerSegment=360/segmentsTotal;
-let canvas=document.getElementById('wheelCanvas');
-let ctx=canvas.getContext('2d');
-let spinButton=document.getElementById('spinButton');
-let resultDisplay=document.getElementById('result');
-let statusDisplay=document.getElementById('status');
-let animationId=null;
-let currentRotation=0;
+
+let canvas = document.getElementById('wheelCanvas');
+let ctx = canvas.getContext('2d');
+let spinButton = document.getElementById('spinButton');
+let resultDisplay = document.getElementById('result');
+let statusDisplay = document.getElementById('status');
+let animationId = null;
+
 let isSpinning=false;
 let isDecelerating=false;
+let spinSpeed=0;
+let maxSpeed=25;
+let currentRotation=0;
 let targetPrizeIndex=-1;
 let stopRotation=0;
 
-// ✅ 修正初始旋转角度（canvas 正上方是 -90°）
-const initialRotation=-90 + 8*anglePerSegment; // “一等奖-再来一次边界线”
-currentRotation=initialRotation;
+// 将初始指针对准正右边并在“一等奖-再来一次”边界
+function initRotation(){
+    // canvas正右为0度, 一等奖(19/20)和再来一次(1/8)边界就是第0边长分界线
+    currentRotation = 0; // 对准正右边
+}
+initRotation();
 
+// 绘制转盘
 function drawWheel(rotation=0){
-    const cx=canvas.width/2,cy=canvas.height/2,radius=Math.min(cx,cy)-10;
+    const centerX=canvas.width/2;
+    const centerY=canvas.height/2;
+    const radius=Math.min(centerX,centerY)-10;
     ctx.clearRect(0,0,canvas.width,canvas.height);
     ctx.save();
-    ctx.translate(cx,cy);
+    ctx.translate(centerX,centerY);
     ctx.rotate(rotation*Math.PI/180);
-    ctx.translate(-cx,-cy);
-    let start=-Math.PI/2;
+    ctx.translate(-centerX,-centerY);
+
+    let startAngle=-Math.PI/2;
     prizes.forEach(prize=>{
-        const angle=prize.probability*2*Math.PI;
-        const end=start+angle;
+        const angle = prize.probability*2*Math.PI;
+        const endAngle=startAngle+angle;
         ctx.beginPath();
-        ctx.moveTo(cx,cy);
-        ctx.arc(cx,cy,radius,start,end);
+        ctx.moveTo(centerX,centerY);
+        ctx.arc(centerX,centerY,radius,startAngle,endAngle);
         ctx.closePath();
         ctx.fillStyle=prize.color;
         ctx.fill();
         ctx.strokeStyle='#fff';
         ctx.lineWidth=2;
         ctx.stroke();
-        // 奖品文字
         ctx.save();
-        ctx.translate(cx,cy);
-        ctx.rotate(start+angle/2);
+        ctx.translate(centerX,centerY);
+        ctx.rotate(startAngle+angle/2);
         ctx.fillStyle='white';
         ctx.font='bold 18px Arial';
         ctx.textAlign='center';
         ctx.textBaseline='middle';
-        ctx.fillText(prize.name,radius*0.7,0);
+        ctx.shadowColor='rgba(0,0,0,0.5)';
+        ctx.shadowBlur=3;
+        ctx.shadowOffsetX=1;
+        ctx.shadowOffsetY=1;
+        const textRadius = radius*0.7;
+        ctx.fillText(prize.name,textRadius,0);
         ctx.font='16px Arial';
-        ctx.fillText(`${(prize.probability*100).toFixed(0)}%`,radius*0.7,20);
+        ctx.fillText(`${(prize.probability*100).toFixed(0)}%`,textRadius,20);
         ctx.restore();
-        start=end;
+        startAngle=endAngle;
     });
+
+    // 中心小圆
     ctx.beginPath();
-    ctx.arc(cx,cy,15,0,2*Math.PI);
+    ctx.arc(centerX,centerY,15,0,2*Math.PI);
     ctx.fillStyle='#fff';
     ctx.strokeStyle='#ddd';
     ctx.lineWidth=3;
@@ -134,25 +151,28 @@ function drawWheel(rotation=0){
     ctx.restore();
 }
 
+// 根据随机数选择奖项
 function selectPrizeByProbability(){
     const rand=Math.random();
-    let cum=0;
+    let cumulative=0;
     for(let i=0;i<prizes.length;i++){
-        cum+=prizes[i].probability;
-        if(rand<=cum)return i;
+        cumulative+=prizes[i].probability;
+        if(rand<=cumulative) return i;
     }
     return prizes.length-1;
 }
 
-function getTargetRotation(prizeIndex){
-    const prize=prizes[prizeIndex];
-    const segments=prize.segments;
-    const midSegment=Math.floor((segments[0]+segments[segments.length-1])/2);
-    return initialRotation + (midSegment-1)*anglePerSegment + 360*5; // 5圈视觉效果
+// 获取指定奖项对应边长中心角度(顺时针)
+function getPrizeStopAngle(index){
+    const slices=prizes[index].slices;
+    const centerSlice = Math.floor((slices[0]+slices[1])/2); // 中心边长编号
+    // 每份边长 360/20 = 18度, 指针指正右边为0
+    return centerSlice*18-9; // 减半份让中心对准指针
 }
 
+// 开始旋转
 function startSpin(){
-    if(isSpinning)return;
+    if(isSpinning) return;
     isSpinning=true;
     isDecelerating=false;
     spinButton.classList.add('spinning');
@@ -161,49 +181,56 @@ function startSpin(){
     spinButton.querySelector('.button-text').textContent='停止';
     statusDisplay.textContent='转盘加速中...';
     resultDisplay.textContent='等待结果...';
-    targetPrizeIndex=selectPrizeByProbability();
+    targetPrizeIndex = selectPrizeByProbability();
+
     spinSpeed=0;
     let lastTime=Date.now();
+
     function accelerate(){
-        if(!isSpinning)return;
+        if(!isSpinning) return;
         const now=Date.now();
         const dt=now-lastTime;
         lastTime=now;
-        spinSpeed+=0.02*dt;
-        if(spinSpeed>=25){
-            spinSpeed=25;
+        spinSpeed += 0.02*dt;
+        if(spinSpeed>=maxSpeed){
+            spinSpeed=maxSpeed;
             isDecelerating=true;
             statusDisplay.textContent='转盘全速旋转中，点击停止按钮...';
             return;
         }
-        currentRotation+=spinSpeed;
+        currentRotation += spinSpeed;
         drawWheel(currentRotation);
         animationId=requestAnimationFrame(accelerate);
     }
     animationId=requestAnimationFrame(accelerate);
 }
 
+// 停止旋转
 function stopSpin(){
-    if(!isSpinning || !isDecelerating)return;
-    // Step1: reset 到初始线
-    currentRotation=initialRotation;
-    drawWheel(currentRotation);
-    // Step2: 顺时针旋转到目标奖品
-    stopRotation=getTargetRotation(targetPrizeIndex);
+    if(!isSpinning || !isDecelerating) return;
+    const targetAngle = getPrizeStopAngle(targetPrizeIndex);
+    // 计算最小顺时针旋转角度
+    let rotationNeeded = targetAngle - (currentRotation%360);
+    if(rotationNeeded<0) rotationNeeded+=360;
+    rotationNeeded += 360*5; // 多转5圈增加视觉效果
+    stopRotation=currentRotation+rotationNeeded;
+
     let lastTime=Date.now();
     function decelerate(){
         const now=Date.now();
         const dt=now-lastTime;
         lastTime=now;
-        const remaining=stopRotation-currentRotation;
-        const speed=Math.max(remaining/20,2);
-        if(remaining<=0.5){
+        const remaining = stopRotation-currentRotation;
+        const deceleration = spinSpeed*spinSpeed/(2*remaining);
+        spinSpeed -= deceleration*dt/16;
+        if(spinSpeed<=0 || remaining<=0.5){
+            spinSpeed=0;
             currentRotation=stopRotation;
             drawWheel(currentRotation);
             finishSpin();
             return;
         }
-        currentRotation+=speed;
+        currentRotation+=spinSpeed;
         drawWheel(currentRotation);
         animationId=requestAnimationFrame(decelerate);
     }
@@ -217,7 +244,8 @@ function finishSpin(){
     const prize=prizes[targetPrizeIndex];
     resultDisplay.textContent=`恭喜！您获得了：${prize.name}！`;
     resultDisplay.style.color=prize.color;
-    spinButton.classList.remove('spinning','stop');
+    spinButton.classList.remove('spinning');
+    spinButton.classList.remove('stop');
     spinButton.classList.add('start');
     spinButton.querySelector('.button-text').textContent='开始';
     statusDisplay.textContent='抽奖完成，奖品已记录到Google Sheets';
@@ -254,7 +282,7 @@ spinButton.addEventListener('click',()=>{
 
 const debugBtn=document.getElementById('debugBtn');
 const centerMarker=document.getElementById('centerMarker');
-debugBtn.addEventListener('click',()=>{centerMarker.style.display=centerMarker.style.display==='block'?'none':'block';});
+debugBtn.addEventListener('click',()=>{ centerMarker.style.display=centerMarker.style.display==='block'?'none':'block'; });
 
 window.addEventListener('load',()=>{
     drawWheel(currentRotation);
