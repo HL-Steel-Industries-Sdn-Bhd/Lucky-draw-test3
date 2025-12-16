@@ -13,9 +13,62 @@ h1 { color: #2575fc; margin-bottom: 10px; font-size: 2.5rem; text-shadow: 1px 1p
 .subtitle { color: #666; margin-bottom: 30px; font-size: 1.1rem; }
 .wheel-container { position: relative; margin: 30px auto; width: 500px; height: 500px; }
 #wheelCanvas { width: 100%; height: 100%; border-radius: 50%; box-shadow: 0 0 0 8px #fff, 0 0 30px rgba(0, 0, 0, 0.2); }
-.pointer { position: absolute; top: 50%; left: 50%; width: 40px; height: 60px; z-index: 10; transform-origin: 50% 50%; }
-.pointer::before { content: ''; position: absolute; width: 0; height: 0; border-left: 20px solid transparent; border-right: 20px solid transparent; border-bottom: 60px solid #ff4757; top: -30px; left: 50%; transform: translateX(-50%); }
-.center-marker { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 8px; height: 8px; background-color: #000; border-radius: 50%; z-index: 5; display: none; }
+.pointer { 
+    position: absolute; 
+    top: 50%; 
+    left: 50%; 
+    width: 0; 
+    height: 0; 
+    z-index: 10; 
+    transform-origin: 50% 50%; /* 改为中心旋转 */
+}
+.pointer-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    z-index: 10;
+    transform-origin: 50% 50%;
+}
+/* 主三角形指针 */
+.pointer-main::before { 
+    content: ''; 
+    position: absolute; 
+    width: 0; 
+    height: 0; 
+    border-left: 25px solid transparent;
+    border-right: 25px solid transparent;
+    border-bottom: 80px solid #ff4757; /* 加长指针使其更像时钟指针 */
+    top: -40px; 
+    left: 50%; 
+    transform: translateX(-50%); 
+}
+/* 对侧红线 */
+.pointer-back::before {
+    content: '';
+    position: absolute;
+    width: 6px;
+    height: 60px;
+    background-color: #ff4757;
+    top: 20px; /* 从中心点向外延伸 */
+    left: 50%;
+    transform: translateX(-50%);
+    border-radius: 3px;
+}
+.pointer-center {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background-color: #ff4757;
+    border-radius: 50%;
+    top: 0;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 11;
+}
+.center-marker { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 15px; height: 15px; background-color: #000; border-radius: 50%; z-index: 15; box-shadow: 0 0 5px rgba(255, 255, 255, 0.8); border: 3px solid white; }
 .controls { margin: 30px 0; }
 #spinButton { background-color: #ff6b81; color: white; border: none; padding: 16px 45px; font-size: 1.4rem; border-radius: 50px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 5px 15px rgba(255, 107, 129, 0.4); font-weight: bold; letter-spacing: 1px; margin-bottom: 25px; }
 #spinButton:hover { background-color: #ff4757; transform: translateY(-3px); box-shadow: 0 8px 20px rgba(255, 107, 129, 0.6); }
@@ -42,7 +95,11 @@ h1 { color: #2575fc; margin-bottom: 10px; font-size: 2.5rem; text-shadow: 1px 1p
 <p class="subtitle">点击开始按钮转动转盘，点击停止按钮停止转盘</p>
 <div class="wheel-container">
 <canvas id="wheelCanvas" width="500" height="500"></canvas>
-<div class="pointer" id="pointer"></div>
+<div class="pointer-container" id="pointerContainer">
+    <div class="pointer-main"></div>
+    <div class="pointer-back"></div>
+    <div class="pointer-center"></div>
+</div>
 <div class="center-marker" id="centerMarker"></div>
 </div>
 <div class="controls">
@@ -63,7 +120,7 @@ h1 { color: #2575fc; margin-bottom: 10px; font-size: 2.5rem; text-shadow: 1px 1p
 <div class="status" id="status">就绪 - 点击开始按钮开始抽奖</div>
 <iframe name="hiddenFrame" class="hidden-frame"></iframe>
 <div style="position: fixed; top: 10px; right: 10px; z-index: 1000;">
-<button id="debugBtn" style="padding: 5px 10px; font-size: 12px; background: #333; color: white; border: none; border-radius: 3px; cursor: pointer;">显示中心点</button>
+<button id="debugBtn" style="padding: 5px 10px; font-size: 12px; background: #333; color: white; border: none; border-radius: 3px; cursor: pointer;">显示/隐藏中心点</button>
 </div>
 </div>
 
@@ -77,17 +134,28 @@ const prizes = [
 
 let canvas = document.getElementById('wheelCanvas');
 let ctx = canvas.getContext('2d');
-let pointer = document.getElementById('pointer');
+let pointerContainer = document.getElementById('pointerContainer');
 let spinButton = document.getElementById('spinButton');
 let resultDisplay = document.getElementById('result');
 let statusDisplay = document.getElementById('status');
 
 let isSpinning=false, isDecelerating=false, spinSpeed=0, maxSpeed=15;
 let currentRotation=0, targetPrizeIndex=-1, stopRotation=0;
+let animationId;
 
 function drawWheel(){
     const centerX=canvas.width/2, centerY=canvas.height/2, radius=Math.min(centerX,centerY)-10;
     ctx.clearRect(0,0,canvas.width,canvas.height);
+    
+    // 绘制转盘中心的小圆圈
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 10, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
     let startAngle=-Math.PI/2;
     prizes.forEach(prize=>{
         const angle=prize.probability*2*Math.PI;
@@ -133,7 +201,8 @@ function getPrizeCenterAngle(index){
 }
 
 function updatePointer(){
-    pointer.style.transform=`rotate(${currentRotation}deg)`;
+    // 设置指针旋转
+    pointerContainer.style.transform=`translate(-50%, -50%) rotate(${currentRotation}deg)`;
 }
 
 function startSpin(){
@@ -149,6 +218,7 @@ function startSpin(){
     targetPrizeIndex = selectPrizeByProbability();
     spinSpeed=0;
     let lastTime=Date.now();
+    
     function accelerate(){
         if(!isSpinning) return;
         const now=Date.now();
@@ -165,6 +235,7 @@ function startSpin(){
         updatePointer();
         animationId=requestAnimationFrame(accelerate);
     }
+    
     animationId=requestAnimationFrame(accelerate);
 }
 
@@ -176,6 +247,7 @@ function stopSpin(){
     rotationNeeded+=360*5; // 多转5圈
     stopRotation=currentRotation+rotationNeeded;
     let lastTime=Date.now();
+    
     function decelerate(){
         const now=Date.now();
         const dt=now-lastTime;
@@ -188,12 +260,14 @@ function stopSpin(){
             currentRotation=stopRotation;
             updatePointer();
             finishSpin();
+            cancelAnimationFrame(animationId);
             return;
         }
         currentRotation+=spinSpeed;
         updatePointer();
         animationId=requestAnimationFrame(decelerate);
     }
+    
     animationId=requestAnimationFrame(decelerate);
     statusDisplay.textContent='指针减速中...';
 }
@@ -242,12 +316,17 @@ spinButton.addEventListener('click',()=>{
 
 const debugBtn=document.getElementById('debugBtn');
 const centerMarker=document.getElementById('centerMarker');
-debugBtn.addEventListener('click',()=>{ centerMarker.style.display=centerMarker.style.display==='block'?'none':'block'; });
+let isDebugVisible = false;
+debugBtn.addEventListener('click',()=>{ 
+    isDebugVisible = !isDebugVisible;
+    centerMarker.style.display = isDebugVisible ? 'block' : 'none';
+});
 
 window.addEventListener('load',()=>{
     drawWheel();
     updatePointer();
     statusDisplay.textContent='就绪 - 点击开始按钮开始抽奖';
+    
     function resizeCanvas(){
         const container=document.querySelector('.wheel-container');
         const size=Math.min(container.offsetWidth,container.offsetHeight);
@@ -256,6 +335,7 @@ window.addEventListener('load',()=>{
         drawWheel();
         updatePointer();
     }
+    
     resizeCanvas();
     window.addEventListener('resize',resizeCanvas);
 });
