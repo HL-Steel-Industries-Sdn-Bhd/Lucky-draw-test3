@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>幸运转盘抽奖</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+        }
+        
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            padding: 20px;
+            color: #333;
+        }
+        
+        .container {
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            width: 100%;
+            max-width: 850px;
+            text-align: center;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        h1 {
+            color: #2575fc;
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1rem;
+        }
+        
+        .wheel-container {
+            position: relative;
+            margin: 30px auto;
+            width: 500px;
+            height: 500px;
+        }
+        
+        #wheelCanvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            box-shadow: 0 0 0 8px #fff, 0 0 30px rgba(0, 0, 0, 0.2);
+        }
+        
+        .pointer {
+            position: absolute;
+            top: -30px;
+            left: 50%;
+            transform: translateX(-50%) translateX(-20px);
+            width: 40px;
+            height: 60px;
+            z-index: 10;
+            filter: drop-shadow(0 5px 5px rgba(0, 0, 0, 0.3));
+        }
+        
+        .pointer::before {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-top: 60px solid #ff4757;
+        }
+        
+        .center-marker {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 8px;
+            height: 8px;
+            background-color: #000;
+            border-radius: 50%;
+            z-index: 5;
+            display: none;
+        }
+        
+        .controls {
+            margin: 30px 0;
+        }
+        
+        #spinButton {
+            background-color: #ff6b81;
+            color: white;
+            border: none;
+            padding: 16px 45px;
+            font-size: 1.4rem;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(255, 107, 129, 0.4);
+            font-weight: bold;
+            letter-spacing: 1px;
+            margin-bottom: 25px;
+        }
+        
+        #spinButton:hover {
+            background-color: #ff4757;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(255, 107, 129, 0.6);
+        }
+        
+        #spinButton:active {
+            transform: translateY(0);
+        }
+        
+        #spinButton.start {
+            background-color: #ff6b81;
+        }
+        
+        #spinButton.stop {
+            background-color: #3742fa;
+        }
+        
+        .result-container {
+            background-color: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+            border-left: 5px solid #2575fc;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+        
+        #result {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #2575fc;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .prize-info {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 30px;
+            text-align: left;
+        }
+        
+        .prize-item {
+            background-color: #f1f8ff;
+            padding: 15px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+        }
+        
+        .prize-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 15px;
+        }
+        
+        .status {
+            margin-top: 20px;
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        .spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .spinning .spinner {
+            display: inline-block;
+        }
+        
+        .hidden-frame {
+            display: none;
+        }
+        
+        @media (max-width: 768px) {
+            .wheel-container {
+                width: 350px;
+                height: 350px;
+            }
+            
+            .container {
+                padding: 20px;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .prize-info {
+                grid-template-columns: 1fr;
+            }
+            
+            .pointer {
+                transform: translateX(-50%) translateX(-14px);
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .wheel-container {
+                width: 280px;
+                height: 280px;
+            }
+            
+            .pointer {
+                transform: translateX(-50%) translateX(-11px);
+            }
+        }
+</style>
+</head>
+
+<body>
+<div class="container">
+    <h1>🎁 幸运转盘抽奖</h1>
+
+    <div class="wheel-container">
+        <canvas id="wheel" width="500" height="500"></canvas>
+        <div class="pointer"></div>
+    </div>
+
+    <button id="spinButton">开始</button>
+    <div id="result">等待抽奖…</div>
+
+    <!-- hidden iframe -->
+    <iframe name="hiddenFrame" style="display:none"></iframe>
+</div>
+
+<script>
+/* ================= 奖项定义 ================= */
+const prizes = [
+  { name: "一等奖", p: 0.10, color: "#FFD166" },
+  { name: "再来一次", p: 0.40, color: "#FF6B8B" },
+  { name: "二等奖", p: 0.20, color: "#4ECDC4" },
+  { name: "三等奖", p: 0.30, color: "#06D6A0" }
+];
+
+// 👉 全局唯一基准线：一等奖 ↔ 再来一次
+const BASE_ANGLE = -90;
+
+/* ================= 状态 ================= */
+let rotation = BASE_ANGLE;
+let speed = 0;
+let state = "idle";   // idle | spinning | stopping
+let targetIndex = null;
+let targetRotation = null;
+
+const canvas = document.getElementById("wheel");
+const ctx = canvas.getContext("2d");
+const btn = document.getElementById("spinButton");
+const result = document.getElementById("result");
+
+/* ================= 画盘 ================= */
+function drawWheel(angle){
+    const cx=250, cy=250, r=230;
+    ctx.clearRect(0,0,500,500);
+    ctx.save();
+    ctx.translate(cx,cy);
+    ctx.rotate(angle*Math.PI/180);
+    ctx.translate(-cx,-cy);
+
+    let start=-Math.PI/2;
+    prizes.forEach(pr=>{
+        const a=pr.p*2*Math.PI;
+        ctx.beginPath();
+        ctx.moveTo(cx,cy);
+        ctx.arc(cx,cy,r,start,start+a);
+        ctx.fillStyle=pr.color;
+        ctx.fill();
+        start+=a;
+    });
+    ctx.restore();
+}
+
+/* ================= 抽奖 ================= */
+function pickPrize(){
+    const r=Math.random();
+    let sum=0;
+    for(let i=0;i<prizes.length;i++){
+        sum+=prizes[i].p;
+        if(r<=sum) return i;
+    }
+    return prizes.length-1;
+}
+
+function prizeCenterAngle(index){
+    let angle=BASE_ANGLE;
+    for(let i=0;i<index;i++){
+        angle+=prizes[i].p*360;
+    }
+    return angle + prizes[index].p*360/2;
+}
+
+/* ================= GS 提交 ================= */
+function submitToGS(prizeName){
+    const form=document.createElement("form");
+    form.method="POST";
+    form.action="https://script.google.com/macros/s/AKfycbw9sCZV_blJ_VQH7np29a7B6JfIV80vN5RL2ucVVpKrsJ9r8FrxouNNWBLSeUUqfzAL/exec";
+    form.target="hiddenFrame";
+
+    const t=document.createElement("input");
+    t.name="timestamp";
+    t.value=new Date().toISOString();
+    form.appendChild(t);
+
+    const p=document.createElement("input");
+    p.name="prize";
+    p.value=prizeName;
+    form.appendChild(p);
+
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+}
+
+/* ================= 动画 ================= */
+function animate(){
+    if(state==="spinning"){
+        speed=Math.min(speed+0.4,25);
+        rotation+=speed;
+    }
+
+    if(state==="stopping"){
+        speed*=0.97;
+        rotation+=speed;
+        if(Math.abs(rotation-targetRotation)<1){
+            rotation=targetRotation;
+            speed=0;
+            state="idle";
+
+            const prize=prizes[targetIndex];
+            result.textContent="恭喜获得："+prize.name;
+            btn.textContent="开始";
+
+            // ✅ 只在这里提交
+            submitToGS(prize.name);
+            return;
+        }
+    }
+
+    drawWheel(rotation);
+    requestAnimationFrame(animate);
+}
+
+/* ================= 按钮 ================= */
+btn.onclick=()=>{
+    if(state==="idle"){
+        targetIndex=pickPrize();                  // 🎯 一开始就决定
+        targetRotation=prizeCenterAngle(targetIndex)+360*5;
+        speed=0;
+        state="spinning";
+        btn.textContent="停止";
+        result.textContent="等待结果…";
+        requestAnimationFrame(animate);
+    }else if(state==="spinning"){
+        state="stopping";                         // 一次就够
+    }
+};
+
+/* ================= 初始化 ================= */
+drawWheel(rotation);
+</script>
+</body>
+</html>
